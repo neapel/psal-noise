@@ -1,7 +1,7 @@
 CXXFLAGS += -Wall -Wextra --std=c++0x -O3 -fopenmp -mtune=native -march=native
 packages = fftw3f
 CXXFLAGS += `pkg-config --cflags $(packages)`
-LDLIBS += --static `pkg-config --libs $(packages)`
+LDLIBS += `pkg-config --libs $(packages)`
 
 new : clean search info
 

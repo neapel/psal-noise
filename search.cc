@@ -16,8 +16,8 @@ double score_rule(plan_t &plan, const rule &r, const std::array<std::bitset<widt
 	using namespace std;
 	const size_t fit_w = 10, resid_w = 100;
 	double avg_fit = 0;
-	for(auto init : initials) {
-		const auto lines = eval<width, height>(r, init);
+	for(auto I = initials.begin() ; I != initials.end() ; I++) {
+		const auto lines = eval<width, height>(r, *I);
 		const auto spec = spectrum<resid_w>(plan, lines);
 		avg_fit += get<0>(fitness<fit_w, resid_w>(spec));
 	}
@@ -44,7 +44,7 @@ struct population_scorer {
 		using namespace std;
 		// first lines
 		array<bitset<width>, 10> initial_lines;
-		for(auto &l : initial_lines) l = initial<width>(gen);
+		for(auto I = initial_lines.begin() ; I != initial_lines.end() ; I++) *I = initial<width>(gen);
 		// score the rules
 		array<scored, population> scores;
 		#pragma omp parallel for default(shared) schedule(static,40)
@@ -64,15 +64,15 @@ struct population_scorer {
 
 template<size_t N>
 std::ostream &operator<<(std::ostream &o, const std::array<std::pair<rule, double>, N> &pop) {
-	for(auto p : pop)
-		o << p.first.to_string() << '\t' << p.second << '\n';
+	for(auto I = pop.begin() ; I != pop.end() ; I++)
+		o << I->first.to_string() << '\t' << I->second << '\n';
 	return o;
 }
 
 template<size_t N>
 std::ostream &operator<<(std::ostream &o, const std::array<rule, N> &pop) {
-	for(auto p : pop)
-		o << p.to_string() <<'\n';
+	for(auto I = pop.begin() ; I != pop.end() ; I++)
+		o << I->to_string() <<'\n';
 	return o;
 }
 

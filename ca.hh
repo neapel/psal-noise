@@ -28,7 +28,7 @@ std::bitset<width> initial(random &gen) {
 template<size_t width, size_t height, size_t rules>
 std::array<std::bitset<width>, height> eval(const std::bitset<rules> &r, const std::bitset<width> &initial) {
 	using namespace std;
-	const size_t neighbors = log2(rules);
+	const size_t neighbors = 5;
 	const size_t delta = (neighbors - 1) / 2;
 	array<bitset<width>, height> d;
 	d[0] = initial;

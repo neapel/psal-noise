@@ -9,7 +9,7 @@ using namespace std;
 int main(int, char**) {
 	const size_t height = 3000, width = 700;
 
-	plan_t<height, double> plan;
+	plan_t<height, float> plan;
 
 	// create and seed RNG
 	random_device dev;

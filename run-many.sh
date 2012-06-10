@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/bin/bash
 while true ; do
 	./run-one.sh
 done

@@ -5,8 +5,9 @@ LDLIBS += `pkg-config --libs $(packages)`
 
 new : clean search info
 
-search : search.cc ca.hh gen.hh linear_fit.hh
-info : info.cc ca.hh linear_fit.hh
+headers=ca.hh gen.hh linear_fit.hh score.hh
+search : search.cc $(headers)
+info : info.cc $(headers)
 
 .PHONY : clean
 clean :

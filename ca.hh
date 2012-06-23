@@ -5,9 +5,10 @@
 #include <bitset>
 #include <array>
 #include <complex>
-#include <fftw3.h>
 #include <random>
 #include <chrono>
+#include <fcntl.h>
+#include <fftw3.h>
 
 // Calculate x for: y = 1 << x.
 constexpr size_t log2(size_t x) {
@@ -44,48 +45,33 @@ std::array<std::bitset<width>, height> eval(const std::bitset<rules> &r, const s
 }
 
 
+template<typename T> T *fftwf_new(size_t n) {
+	return reinterpret_cast<T *>(fftwf_malloc(n * sizeof(T)));
+}
+
 template<size_t N, typename T> struct plan_t;
 
 template<size_t N>
 struct plan_t<N, float> {
+	typedef std::complex<float> C;
 	float *in;
-	std::complex<float> *out;
+	C *out;
 	fftwf_plan plan;
 
 	plan_t() {
-		in = fftwf_alloc_real(N);
-		auto out_ = fftwf_alloc_complex(N/2+1);
-		out = reinterpret_cast<std::complex<float>*>(out_);
-		fftwf_import_wisdom_from_filename("fftwf.wisdom");
-		plan = fftwf_plan_dft_r2c_1d(N, in, out_, FFTW_EXHAUSTIVE);
-		fftwf_export_wisdom_to_filename("fftwf.wisdom");
+		in = fftwf_new<float>(N);
+		out = fftwf_new<C>(N/2+1);
+		FILE *fi = fopen("fftwf.wisdom", "r");
+		if(fi) { fftwf_import_wisdom_from_file(fi); fclose(fi); }
+		plan = fftwf_plan_dft_r2c_1d(N, in, reinterpret_cast<float (*)[2]>(out), FFTW_EXHAUSTIVE);
+		FILE *fo = fopen("fftwf.wisdom", "w");
+		if(fo) { fftwf_export_wisdom_to_file(fo); fclose(fo); }
 	}
 
 	void operator()() {
 		fftwf_execute(plan);
 	}
 };
-
-template<size_t N>
-struct plan_t<N, double> {
-	double *in;
-	std::complex<double> *out;
-	fftw_plan plan;
-
-	plan_t() {
-		in = fftw_alloc_real(N);
-		auto out_ = fftw_alloc_complex(N/2+1);
-		out = reinterpret_cast<std::complex<double>*>(out_);
-		fftw_import_wisdom_from_filename("fftw.wisdom");
-		plan = fftw_plan_dft_r2c_1d(N, in, out_, FFTW_EXHAUSTIVE);
-		fftw_export_wisdom_to_filename("fftw.wisdom");
-	}
-
-	void operator()() {
-		fftw_execute(plan);
-	}
-};
-
 
 
 // Calculate the frequency spectrum of this array.

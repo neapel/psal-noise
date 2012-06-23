@@ -8,15 +8,28 @@
 #include <random>
 #include <stdexcept>
 #include <fstream>
-
+#include <boost/program_options.hpp>
 
 
 using namespace std;
 using namespace std::chrono;
+using namespace boost::program_options;
 
 
 
 int main(int argc, char **argv) {
+	options_description desc("Options");
+	desc.add_options()
+		("new", "Start a new simulation")
+		("resume", value<string>(), "Resume a simulation")
+		("generations", value<size_t>(), "Run for this many generations");
+	
+	variables_map vm;
+	store(parse_command_line(argc, argv, desc), vm);
+	notify(vm);
+
+	
+
 	if(argc != 2) {
 		cerr << "Usage: " << argv[0] << " output-file" << endl;
 		return 1;

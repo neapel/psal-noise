@@ -7,6 +7,7 @@
 #include <array>
 #include <set>
 #include <random>
+#include <iostream>
 
 // Generate a random rule in which `lambda` bits are 1.
 // The LSB is always 0.
@@ -72,23 +73,29 @@ std::bitset<N> mutate(random &gen, const std::bitset<N> &x, double prob = 0.05) 
 
 // Create the next generation from the scored generation
 // Assuming the input is already sorted.
-template<size_t elite, size_t rules, size_t count, typename random>
-std::array<std::bitset<rules>, count> next_generation(random &gen, const std::array<std::pair<std::bitset<rules>, double>, count> &pop) {
+template<size_t elite, size_t rules, size_t count, typename random, template<size_t> class scored>
+std::array<std::bitset<rules>, count> next_generation(random &gen, const std::array<scored<rules>, count> &pop, std::ostream &genealogy) {
 	using namespace std;
 	set<bitset<rules>> next;
 	// copy the best rules
-	for(size_t i = 0 ; i < elite ; i++)
-		next.insert(pop[i].first);
+	for(size_t i = 0 ; i < elite ; i++) {
+		next.insert(pop[i].the_rule);
+		genealogy << "elite " << pop[i].the_rule.to_string() << '\n';
+	}
 	// set up the roulette wheel
 	array<double, count> scores;
-	for(size_t i = 0 ; i < count ; i++) scores[i] = pop[i].second;
+	for(size_t i = 0 ; i < count ; i++) scores[i] = pop[i].avg_score;
 	discrete_distribution<size_t> wheel(scores.begin(), scores.end());
 	// create the rest by roulette crossover
 	while(next.size() < count) {
-		const auto c = uniform_crossover(gen, pop[wheel(gen)].first, pop[wheel(gen)].first);
-		next.insert(mutate(gen, c.first));
-		next.insert(mutate(gen, c.second));
+		const auto p1 = pop[wheel(gen)].the_rule, p2 = pop[wheel(gen)].the_rule;
+		const auto c = uniform_crossover(gen, p1, p2);
+		const auto c1 = mutate(gen, c.first), c2 = mutate(gen, c.second);
+		next.insert(c1);
+		next.insert(c2);
+		genealogy << "mate " << p1 << ' ' << p2 << " children " << c1 << ' ' << c2 << '\n';
 	}
+	genealogy << endl;
 	// got enough, maybe 1 too many.
 	array<bitset<rules>, count> out;
 	copy_n(next.begin(), count, out.begin());

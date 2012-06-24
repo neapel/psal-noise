@@ -9,34 +9,45 @@
 #include <stdexcept>
 #include <fstream>
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/format.hpp>
+#include <boost/lexical_cast.hpp>
 
 
 using namespace std;
 using namespace std::chrono;
+using namespace boost;
 using namespace boost::program_options;
+using namespace boost::filesystem;
 
 
 
 int main(int argc, char **argv) {
-	options_description desc("Options");
+	size_t generations;
+	string directory;
+	options_description desc("Usage: " + string(argv[0]) + " [options]\nOptions");
 	desc.add_options()
-		("new", "Start a new simulation")
-		("resume", value<string>(), "Resume a simulation")
-		("generations", value<size_t>(), "Run for this many generations");
+		("help", "Show this message")
+		("name", value<string>(&directory)->required(), "Input/output folder name.")
+		("generations", value<size_t>(&generations)->default_value(200), "Run for this many generations");
+	positional_options_description pos;
+	pos.add("name", 1);
 	
 	variables_map vm;
-	store(parse_command_line(argc, argv, desc), vm);
-	notify(vm);
-
-	
-
-	if(argc != 2) {
-		cerr << "Usage: " << argv[0] << " output-file" << endl;
-		return 1;
+	store(command_line_parser(argc, argv).options(desc).positional(pos).run(), vm);
+	if(vm.count("help")) {
+		cerr << desc;
+		return EXIT_SUCCESS;
+	}
+	try {
+		notify(vm);
+	} catch(required_option e) {
+		cerr << e.what() << endl << desc;
+		return EXIT_FAILURE;
 	}
 
+	// basic options
 	const size_t width = 700, height = 3000;
-	const size_t generations = 200;
 	const size_t population = 160, elite = 20;
 
 	// create and seed RNG
@@ -46,22 +57,57 @@ int main(int argc, char **argv) {
 	// parallel scorer
 	population_scorer<width, height, float> scorer;
 
-	string base(argv[1]);
+	format pop_fmt("%s/%05d.pop");
+	format gen_fmt("%s/%05d.gen");
 
+	// load or create initial population
+	typedef bitset<32> rule_t;
 	auto pop = initial_population<32, population>(random);
-	for(size_t g = 0 ; g < generations || true ; g++) {
-		ofstream pop_out(base + ".pop", ios::app);
-		ofstream gen_out(base + ".gen", ios::app);
 
-		cout << "# generation " << setw(4) << g << flush;
+	size_t start_gen = 0;
+	if(exists(directory)) {
+		// load the last generation as the next initial generation.
+		// this will overwrite that generation, but it should be unscored anyway.
+		vector<path> files;
+		copy(directory_iterator(directory), directory_iterator(), back_inserter(files));
+		if(files.size() > 0) {
+			auto last = *max_element(files.begin(), files.end());
+			start_gen = lexical_cast<size_t>(last.filename().stem().string());
+			ifstream in(last.string());
+			in.exceptions(ifstream::failbit | ifstream::eofbit | ifstream::badbit);
+			for(size_t i = 0 ; i < population ; i++) {
+				string line;
+				getline(in, line);
+				pop[i] = rule_t(line);
+			}
+		}
+	} else {
+		create_directory(directory);
+	}
+
+	// run
+	for(size_t g = 0 ; g < generations ; g++) {
+		const size_t this_gen = g + start_gen;
+
+		// score current population
+		cout << "# generation " << setw(5) << this_gen << flush;
 		const auto t_start = high_resolution_clock::now();
 		const auto pop_scored = scorer(random, pop);
 		const duration<double> dur = high_resolution_clock::now() - t_start;
 		cout << " total " << dur.count() << "s" << endl;
 
+		// save score
+		ofstream pop_out(str(pop_fmt % directory % this_gen));
 		pop_out << pop_scored << endl;
+
+		// create next population, save parentage/elitism
+		ofstream gen_out(str(gen_fmt % directory % (this_gen + 1)));
 		pop = next_generation<elite>(random, pop_scored, gen_out);
+
+		// save next population, overwrite with score in next step.
+		ofstream next_pop_out(str(pop_fmt % directory % (this_gen + 1)));
+		next_pop_out << pop << endl;
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }

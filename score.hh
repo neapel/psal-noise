@@ -56,6 +56,8 @@ std::ostream &operator<<(std::ostream &o, const scored<rules> &s) {
 
 
 
+
+
 template<size_t width, size_t height, typename real>
 struct population_scorer {
 	typedef plan_t<height, real> _plan_t;
@@ -92,6 +94,13 @@ template<size_t N, size_t rules>
 std::ostream &operator<<(std::ostream &o, const std::array<scored<rules>, N> &pop) {
 	for(size_t i = 0 ; i < N ; i++)
 		o << pop[i] << '\n';
+	return o;
+}
+
+template<size_t rules, size_t population>
+std::ostream &operator<<(std::ostream &o, const std::array<std::bitset<rules>, population> &r) {
+	for(size_t i = 0 ; i < population ; i++)
+		o << r[i].to_string() << '\n';
 	return o;
 }
 

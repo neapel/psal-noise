@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <fstream>
 #include <boost/program_options.hpp>
+#define BOOST_FILESYSTEM_VERSION 2
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
@@ -72,7 +73,7 @@ int main(int argc, char **argv) {
 		copy(directory_iterator(directory), directory_iterator(), back_inserter(files));
 		if(files.size() > 0) {
 			auto last = *max_element(files.begin(), files.end());
-			start_gen = lexical_cast<size_t>(last.filename().stem().string());
+			start_gen = lexical_cast<size_t>(last.stem());
 			ifstream in(last.string());
 			in.exceptions(ifstream::failbit | ifstream::eofbit | ifstream::badbit);
 			for(size_t i = 0 ; i < population ; i++) {

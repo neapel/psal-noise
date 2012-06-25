@@ -1,5 +1,6 @@
 #!/bin/bash
 while true ; do
-	./run-one.sh
-	sleep 30s
+	for x in $* ; do
+		./search $x
+	done
 done

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from glob import glob
+import sys
+import os.path
 
 def read_pop(name, limit=20):
 	for fname in sorted(glob(name + '/*.pop')):
@@ -8,6 +10,8 @@ def read_pop(name, limit=20):
 			gen = []
 			for line, _ in zip(f, range(limit)):
 				fields = line.split()
+				if len(fields) < 2:
+					return
 				rule = fields[0]
 				fits = map(float, fields[1:])
 				gen.append(tuple([rule] + fits))
@@ -77,6 +81,18 @@ def overviews(*names):
 		print 'set output "%s.png"' % name
 		overview(name)
 
+def averages(*names):
+	print 'reset'
+	print 'set key outside center horizontal top samplen 1'
+	print 'plot ', ','.join([
+		('"-" volatile w l lc palette frac %f lt %d t "%s"' % (i/20.0,i,os.path.basename(name),))
+		for i, name in enumerate(names)
+	])
+	for name in names:
+		for x in smooth(map(mean, read_pop(name)), d=10):
+			print x
+		print 'e'
+
 def avg_elite(*names):
 	print 'unset key'
 	print 'plot ', ', '.join(['"-" smooth bezier w l' for k in names])
@@ -86,7 +102,5 @@ def avg_elite(*names):
 		print 'e'
 
 if __name__ == '__main__':
-	import sys
-	import os.path
 	names = list([os.path.splitext(n)[0] for n in sys.argv[2:]])
 	locals()[sys.argv[1]](*names)

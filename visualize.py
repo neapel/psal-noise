@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 # encoding=utf-8
 
+from __future__ import division
 from glob import glob
 import sys
 import os.path
+from numpy import *
 
 ALL = 160
 ELITE = 20
@@ -51,17 +53,18 @@ def read_gen(name):
 def mean(points, at=1):
 	return sum([p[at] for p in points]) / len(points)
 
-def smooth(points, d=2):
-	out = list(points)
-	for i in range(len(points)):
-		context = points[max(0,i - d):min(len(points),i + 1 + d)]
-		out[i] = sum(context) / len(context)
-	return out
+def smooth(points, window=1+2*25):
+	if window == 0:
+		return list(points)
+	w = hanning(window)
+	data = [points[0]] * window + points + [points[-1]] * window
+	out = convolve(w / sum(w), data, 'same')
+	return out[window:-window]
 
 def overview(name):
 	d = list(read_pop(name))
 	md = map(mean, d)
-	smd = smooth(md, d=10)
+	smd = smooth(md)
 	print 'reset'
 	print 'set title "%s"' % (name,)
 	print 'unset key'
@@ -90,28 +93,35 @@ def overview(name):
 def overviews(*names):
 	print 'set terminal pngcairo notransparent size 1000,400'
 	for name in names:
-		print 'print "%s"' % name
-		print 'set output "%s.png"' % name
+		print 'print "{0}"'.format(name)
+		print 'set output "{0}.png"'.format(name)
 		overview(name)
 
 def averages(*names):
 	print 'reset'
-	print 'set key outside center horizontal top samplen 1'
+	print 'unset key'
+	print 'unset colorbox'
+	print 'set palette rgb 33,13,10'
+	print 'unset border'
+	print 'set grid xtics noytics back lt 1 lc rgbcolor "grey"'
+	print 'set xtics scale 0 textcolor rgbcolor "grey"'
+	print 'set yrange [0:*]'
+	print 'set ytics scale 0'
 	print 'plot ', ','.join([
-		('"-" volatile w l lc palette frac %f lt %d t "%s"' % (i/20.0,i,os.path.basename(name),))
+		('"-" volatile w p pt 5 ps 0.01 lw 1.25 lc palette frac {0} notitle, '
+		+ '"-" volatile w l lw 2 lc palette frac {0} t "{1}"').format(
+			i/len(names), os.path.basename(name))
 		for i, name in enumerate(names)
 	])
 	for name in names:
-		for x in smooth(map(mean, read_pop(name)), d=10):
-			print x
+		m = map(mean, read_pop(name))
+		for x in m: print x
+		print 'e'
+		for x in smooth(m): print x
 		print 'e'
 
-def avg_elite(*names):
-	print 'unset key'
-	print 'plot ', ', '.join(['"-" smooth bezier w l' for k in names])
-	for name in names:
-		for gen in read_pop(name): print mean(gen, 1)
-		print 'e'
+def binstring(s):
+	return s.replace('0','.').replace('1','▮')
 
 def one_pop(name):
 	pop_whole = filter(lambda x: x[1] > 1, read_last_pop(name, ALL))
@@ -129,7 +139,7 @@ def one_pop(name):
 	print 'set encoding utf8'
 	print 'set xtics scale 0 rotate by -90 offset -0.5,-0.5 font "Monospace,5" ("" 0)'
 	for x, l in enumerate(pop_whole):
-		print 'set xtics add ("%s" %d)' % (l[0].replace('0','.').replace('1','▮'), x) 
+		print 'set xtics add ("%s" %d)' % (binstring(l[0]), x) 
 	print 'plot ',
 	print '"-" volatile w impulses lc rgbcolor "gray", ',
 	for i in s:
@@ -142,6 +152,36 @@ def one_pop(name):
 		print 'e'
 	for x in pop_a: print x
 	print 'e'
+
+def profile(name):
+	profiles = []
+	for g in read_pop(name):
+		profile = array([0.0] * 32)
+		for i in g:
+			profile += array(map(int, i[0]))
+		profile /= len(g)
+		profiles.append(profile)
+	profiles = vstack(profiles)
+
+	print 'reset'
+	print 'set palette rgb 33,13,10'
+	print 'unset colorbox'
+	print 'set yrange [-0.5:31.5]'
+	print 'set lmargin 8'
+	print 'unset border'
+	print 'set ytics scale 0 ({0}) font "Monospace"'.format(','.join([
+		'"{0}" {1}'.format(binstring(bin(i)[2:].rjust(5,'0')), i)
+		for i in range(32)
+	]))
+	print 'set xrange [0:200]'
+	print 'set xtics out nomirror'
+	print 'plot "-" matrix w image'
+	print '\n'.join([' '.join(map(str, line)) for line in reversed(transpose(profiles))])
+	print 'e'
+	print 'e'
+
+
+
 
 def lambda_hist(*names):
 	lambdas = [0] * 32

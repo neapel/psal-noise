@@ -162,7 +162,6 @@ def profile(name):
 		profile /= len(g)
 		profiles.append(profile)
 	profiles = vstack(profiles)
-
 	print 'reset'
 	print 'set palette rgb 33,13,10'
 	print 'unset colorbox'

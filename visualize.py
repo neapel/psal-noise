@@ -8,6 +8,7 @@ import os.path
 from numpy import *
 from random import random
 from operator import itemgetter
+from subprocess import check_output
 
 ALL = 160
 ELITE = 20
@@ -344,7 +345,54 @@ def genealogy(name):
 	print 'e'
 
 
-	
+def one_spectrum(rule):
+	out = check_output(['./search', '--info', rule])
+	out = out.split('\n')
+	fit, alpha, beta = map(float, out[0].split())
+	data = out[3:]
+	return fit, alpha, beta, data
+
+
+def spectrum(rule, width=1, height=1):
+	width=int(width)
+	height=int(height)
+
+	print 'reset'
+	print 'set termoption enhanced'
+	print 'set logscale xyx2'
+	print 'set yrange [0.0001:100]'
+	print 'set xrange [1:1500]'
+	print 'set x2range [1:1500]'
+	print 'set xtics out nomirror format "10^{%T}"'
+	print 'set ytics out nomirror format "10^{%T}"'
+
+	print 'set x2tics scale 0 format "" (10, 100)'
+	print 'set style line 8 lt 1 lc rgbcolor "gray"'
+	print 'set grid x2 ls 8'
+
+	print 'set border 3'
+	print 'unset key'
+	print 'set style fill solid 0.125'
+
+	print 'set multiplot layout {0},{1}'.format(width, height)
+
+	for i in range(width * height):
+		fit, alpha, beta, data = one_spectrum(rule)
+		print 'set title "{{/Symbol a}}={0:.4f} {{/Symbol b}}={1:.4f} f={2:.2f}" enhanced'.format(alpha, beta, fit)
+
+		print 'plot ',
+		print '"-" volatile w filledcu lc rgbcolor "red", ',
+		print 'exp({0} + {1} * log(x)) w l lw 2 lc rgbcolor "red", '.format(alpha, beta),
+		print '"-" volatile using ($0 + 1):1 w p pt 5 ps 0.2 lc rgbcolor "black"'
+		for x, y in enumerate(data[:100], 1):
+			print x, y, exp(alpha + beta * log(x)) 
+		print 'e'
+		print '\n'.join(data)
+		print 'e'
+
+	print 'unset multiplot'
+
+
 
 
 if __name__ == '__main__':

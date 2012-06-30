@@ -9,11 +9,11 @@
 #include <iostream>
 #include <omp.h>
 
+const size_t fit_w = 10, resid_w = 100;
 
 template<size_t height, size_t width, size_t N, typename rule, typename plan_t>
 std::array<double, N> score_rule(plan_t &plan, const rule &r, const std::array<std::bitset<width>, N> &initials) {
 	using namespace std;
-	const size_t fit_w = 10, resid_w = 100;
 	array<double, N> fit;
 	for(size_t i = 0 ; i < N ; i++) {
 		const auto lines = eval<width, height>(r, initials[i]);

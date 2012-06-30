@@ -9,6 +9,8 @@
 #include <random>
 #include <iostream>
 
+double mutation_prob = 0.05, crossover_prob = 0.6;
+
 // Generate a random rule in which `lambda` bits are 1.
 // The LSB is always 0.
 template<size_t rules, typename random>
@@ -48,10 +50,10 @@ std::array<std::bitset<rules>, count> initial_population(random &gen) {
 
 // Uniform crossover. Swaps bits between two genomes with some probability.
 template<size_t N, typename random>
-std::pair<std::bitset<N>, std::bitset<N>> uniform_crossover(random &gen, const std::bitset<N> &a, const std::bitset<N> &b, double prob = 0.6) {
+std::pair<std::bitset<N>, std::bitset<N>> uniform_crossover(random &gen, const std::bitset<N> &a, const std::bitset<N> &b) {
 	using namespace std;
 	auto x = a, y = b;
-	bernoulli_distribution bit(1 - prob);
+	bernoulli_distribution bit(1 - crossover_prob);
 	for(size_t i = 0 ; i < N ; i++)
 		if(bit(gen)) {
 			const bool temp = x[i];
@@ -63,8 +65,8 @@ std::pair<std::bitset<N>, std::bitset<N>> uniform_crossover(random &gen, const s
 
 // Flip bits with some probability.
 template<size_t N, typename random>
-std::bitset<N> mutate(random &gen, const std::bitset<N> &x, double prob = 0.05) {
-	std::bernoulli_distribution bit(prob);
+std::bitset<N> mutate(random &gen, const std::bitset<N> &x) {
+	std::bernoulli_distribution bit(mutation_prob);
 	auto y = x;
 	for(size_t i = 1 ; i < N ; i++)
 		if(bit(gen)) y[i] = !y[i];

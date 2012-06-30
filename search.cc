@@ -31,7 +31,10 @@ int main(int argc, char **argv) {
 		("help", "Show this message.")
 		("info", value<string>(&rule_info), "Calculate the frequency profile/score of one rule for one initial configuration.")
 		("name", value<string>(&directory), "Batch input/output folder name.")
-		("generations", value<size_t>(&generations)->default_value(200), "Batch run for this many generations.");
+		("generations", value<size_t>(&generations)->default_value(200), "Batch run for this many generations.")
+		("mutation", value<double>(&mutation_prob)->default_value(0.05), "Probability of mutating=flipping one child bit.")
+		("crossover", value<double>(&crossover_prob)->default_value(0.6), "Uniform crossover proportion.")
+		;
 	positional_options_description pos;
 	pos.add("name", 1);
 	

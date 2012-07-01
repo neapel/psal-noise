@@ -15,6 +15,22 @@ constexpr size_t log2(size_t x) {
 	return __builtin_ffsll(x) - 1;
 }
 
+template<size_t length>
+struct rule_traits {
+	enum {
+		neighbors = log2(length),
+		delta = (neighbors - 1) / 2
+	};
+};
+
+// Specialisations for older GCC.
+template<>
+struct rule_traits<32> { enum { neighbors = 5, delta = 2 }; };
+
+template<>
+struct rule_traits<8> { enum { neighbors = 3, delta = 1 }; };
+
+
 // Create an initial configuration: Random uniform distribution of 0 and 1.
 template<size_t width, typename random>
 std::bitset<width> initial(random &gen) {
@@ -29,8 +45,8 @@ std::bitset<width> initial(random &gen) {
 template<size_t width, size_t height, size_t rules>
 std::array<std::bitset<width>, height> eval(const std::bitset<rules> &r, const std::bitset<width> &initial) {
 	using namespace std;
-	const size_t neighbors = 5;
-	const size_t delta = (neighbors - 1) / 2;
+	const size_t neighbors = rule_traits<rules>::neighbors;
+	const size_t delta = rule_traits<rules>::delta;
 	array<bitset<width>, height> d;
 	d[0] = initial;
 	// Evaluate each line.

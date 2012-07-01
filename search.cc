@@ -22,6 +22,27 @@ using namespace boost::program_options;
 using namespace boost::filesystem;
 
 
+template<size_t width, size_t height, size_t length, typename Random>
+void show_info(bitset<length> rule, Random random) {
+	// run once
+	const auto lines = eval<width, height>(rule, initial<width>(random));
+
+	// calculate spectrum
+	plan_t<height, float> plan;
+	const auto spec = spectrum<height/2+1>(plan, lines);
+
+	double fit, alpha, beta;
+	tie(fit, alpha, beta) = fitness<fit_w, resid_w>(spec);
+
+	// dump
+	cout.precision(10);
+	cout << scientific;
+	cout << fit << '\t' << alpha << '\t' << beta << "\n\n\n";
+	for(size_t i = 0 ; i != spec.size() ; i++)
+		cout << spec[i] << '\n';
+}
+
+
 
 int main(int argc, char **argv) {
 	size_t generations;
@@ -60,28 +81,18 @@ int main(int argc, char **argv) {
 	random_device dev;
 	mt19937 random(dev());
 
-	if(vm.count("info")) {
-		// show info
-		
-		// run once
-		const auto lines = eval<width, height>(rule_t(rule_info), initial<width>(random));
+	if(vm.count("info")) { // show info
 
-		// calculate spectrum
-		plan_t<height, float> plan;
-		const auto spec = spectrum<height/2+1>(plan, lines);
+		switch(rule_info.size()) {
+			case 32:
+				show_info<width, height>(bitset<32>(rule_info), random);
+				break;
+			case 8:
+				show_info<width, height>(bitset<8>(rule_info), random);
+				break;
+		}
 
-		double fit, alpha, beta;
-		tie(fit, alpha, beta) = fitness<fit_w, resid_w>(spec);
-
-		// dump
-		cout.precision(10);
-		cout << scientific;
-		cout << fit << '\t' << alpha << '\t' << beta << "\n\n\n";
-		for(size_t i = 0 ; i != spec.size() ; i++)
-			cout << spec[i] << '\n';
-
-	} else if(vm.count("name")) {
-		// batch run
+	} else if(vm.count("name")) { // batch run
 
 		// parallel scorer
 		population_scorer<width, height, float> scorer;

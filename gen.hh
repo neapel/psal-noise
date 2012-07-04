@@ -9,7 +9,10 @@
 #include <random>
 #include <iostream>
 
-double mutation_prob = 0.05, crossover_prob = 0.6;
+// Probability for one bit to be swapped
+double mutation_prob = 0.05;
+// Probability for crossover to happen at all
+double crossover_prob = 0.6;
 
 // Generate a random rule in which `lambda` bits are 1.
 // The LSB is always 0.
@@ -48,12 +51,13 @@ std::array<std::bitset<rules>, count> initial_population(random &gen) {
 	return out;
 }
 
-// Uniform crossover. Swaps bits between two genomes with some probability.
+// Uniform crossover. Swaps bits randomly.
 template<size_t N, typename random>
 std::pair<std::bitset<N>, std::bitset<N>> uniform_crossover(random &gen, const std::bitset<N> &a, const std::bitset<N> &b) {
 	using namespace std;
 	auto x = a, y = b;
-	bernoulli_distribution bit(1 - crossover_prob);
+	// Swap bits with P_s = 0.5.
+	bernoulli_distribution bit;
 	for(size_t i = 0 ; i < N ; i++)
 		if(bit(gen)) {
 			const bool temp = x[i];
@@ -84,6 +88,7 @@ std::array<std::bitset<rules>, count> next_generation(random &gen, const std::ar
 		next.insert(pop[i].the_rule);
 		genealogy << "elite " << pop[i].the_rule.to_string() << '\n';
 	}
+	bernoulli_distribution do_crossover(crossover_prob);
 	// set up the roulette wheel
 	array<double, count> scores;
 	for(size_t i = 0 ; i < count ; i++) scores[i] = pop[i].avg_score;
@@ -91,11 +96,20 @@ std::array<std::bitset<rules>, count> next_generation(random &gen, const std::ar
 	// create the rest by roulette crossover
 	while(next.size() < count) {
 		const auto p1 = pop[wheel(gen)].the_rule, p2 = pop[wheel(gen)].the_rule;
-		const auto c = uniform_crossover(gen, p1, p2);
-		const auto c1 = mutate(gen, c.first), c2 = mutate(gen, c.second);
-		next.insert(c1);
-		next.insert(c2);
-		genealogy << "mate " << p1 << ' ' << p2 << " children " << c1 << ' ' << c2 << '\n';
+		if(do_crossover(gen)) {
+			const auto c = uniform_crossover(gen, p1, p2);
+			const auto c1 = mutate(gen, c.first), c2 = mutate(gen, c.second);
+			next.insert(c1);
+			next.insert(c2);
+			genealogy << "mate " << p1 << ' ' << p2 << " children " << c1 << ' ' << c2 << '\n';
+		} else {
+			// no crossover, just mutate
+			const auto c1 = mutate(gen, p1), c2 = mutate(gen, p2);
+			next.insert(c1);
+			next.insert(c2);
+			genealogy << "mutate " << p1 << ' ' << c1 << '\n';
+			genealogy << "mutate " << p2 << ' ' << c2 << '\n';
+		}
 	}
 	genealogy << endl;
 	// got enough, maybe 1 too many.

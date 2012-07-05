@@ -56,12 +56,15 @@ def read_gen(name):
 				fields = line.split()
 				if len(fields) > 1:
 					if fields[0] == 'elite':
-						gen[fields[1]] = (fields[1],)
+						gen[fields[1]] = ('e', fields[1])
 					elif fields[0] == 'mate' and fields[3] == 'children':
 						if fields[4] not in gen:
-							gen[fields[4]] = (fields[1], fields[2])
+							gen[fields[4]] = ('c', fields[1], fields[2])
 						if fields[5] not in gen:
-							gen[fields[5]] = (fields[1], fields[2])
+							gen[fields[5]] = ('c', fields[1], fields[2])
+					elif fields[0] == 'mutate':
+						if fields[2] not in gen:
+							gen[fields[2]] = ('m', fields[1])
 			if len(gen) > 0:
 				yield gen
 
@@ -212,6 +215,58 @@ def profile(ptype, name):
 	print 'e'
 	print 'e'
 
+def roulette(name):
+	def prepare_pie(data):
+		return ','.join([
+			'"-" w {0} lc rgbcolor "{1}"'.format(
+				'filledcurve',
+				('#ff0000' if i % 2 else '#440000') if i < ELITE \
+					else ('#0000ff' if i%2 else '#000044')
+			)
+			for i in range(len(data))
+		])
+
+	def make_pie(pop, inner=0.8, outer=1.0):
+		data = map(itemgetter(1), pop)
+		cum = cumsum([0] + data)
+		angles = cum * (2 * pi / cum[-1])
+		for start, end in zip(angles, angles[1:]):
+			delta = end - start
+			steps = int(delta / pi * 180 / 2)
+			angles = start + delta / (steps + 1) * array(range(0, steps + 2))
+			# outer rim
+			for x in angles: print outer * sin(x), outer * cos(x)
+			# inner rim
+			for x in reversed(angles): print inner * sin(x), inner * cos(x)
+			print 'e'
+
+	print '''
+		reset
+		set size square
+		unset border
+		unset xtics
+		unset ytics
+		unset colorbox
+		unset key
+		set palette rgb 33,13,10
+	'''
+
+	last = read_last_pop(name, ALL)
+
+	print 'plot', prepare_pie(last),
+	print ', "-" w l lw 2 lc rgb "black"'
+	make_pie(last, 0.8, 1.0)
+
+	r1 = 0.7
+	r2 = 0.78
+	for i in range(ALL):
+		x = random() * (2 * pi)
+		print r1 * sin(x), r1 * cos(x)
+		print r2 * sin(x), r2 * cos(x)
+		print
+	print 'e'
+
+
 def lambda_hist(*names):
 	lambdas = [0] * 32
 	for name in names:
@@ -238,7 +293,7 @@ def lambda_hist(*names):
 	for x in paper_lambdas: print x
 	print 'e'
 
-def parenthood(name): # run112
+def parenthood(name):
 	n = 7
 	pop = list({} for _ in range(n + 1))
 	for i, g in zip(range(n + 1), read_pop(name, ALL)):
@@ -247,41 +302,52 @@ def parenthood(name): # run112
 
 	super_elite_lines = []
 	super_mate_lines = []
+	super_mutate_lines = []
 	elite_lines = []
 	mate_lines = []
+	mutate_lines = []
 	for i, g in zip(range(n), read_gen(name)):
 		for k, v in g.items():
 			child = pop[i + 1].get(k, None)
 			if child:
-				parents = map(lambda x: pop[i][x], v)
-				appto = None
-				if child[2] == 0:
-					appto = super_elite_lines if len(parents) == 1 else super_mate_lines
-				else:
-					appto = elite_lines if len(parents) == 1 else mate_lines
+				parents = map(lambda x: pop[i][x], v[1:])
+				appto = {'e': super_elite_lines, 'c': super_mate_lines, 'm': super_mutate_lines} if child[2] == 0 \
+						else {'e': elite_lines, 'c': mate_lines, 'm': mutate_lines}
 				for p in parents:
-					appto.append( child + p )
+					appto[v[0]].append( child + p )
 
-	print 'reset'
-	print 'set key left top samplen 1'
-	print 'unset border'
-	print 'unset ytics'
-	print 'set xtics scale 0 font ",8"'
-	print 'set xrange [-0.5:{0}]'.format(n + 0.5)
-	print 'set style line 1 lw 0.1 lc rgbcolor "blue"'
-	print 'set style line 2 lw 0.5 lc rgbcolor "red"'
-	print 'plot ',
-	print '"-" w l ls 1 notitle,',
-	print '"-" w l ls 2 notitle,',
-	print '"-" w l ls 1 lw 1.25 t "Crossover",',
-	print '"-" w l ls 2 lw 1.5 t "Kopiert",',
-	print '"-" w p pt 5 ps 0.3 lc rgbcolor "black" t "Regeln" '
+	print r'''
+		reset
+		set key left top samplen 1
+		unset border
+		unset ytics
+		set xtics scale 0 font ",8"
+		set xrange [-0.5:{0}]
+		set yrange [0:*]
+		set xlabel "Generation" font ",8"
+		set ylabel "Fitness →" font ",8"
+		set style line 1 lw 1 lc rgbcolor "#0000ee"
+		set style line 3 lw 1 lc rgbcolor "#00ee00"
+		set style line 2 lw 1 lc rgbcolor "#ee0000"
+
+		plot \
+			"-" w l ls 3 notitle, \
+			"-" w l ls 1 notitle, \
+			"-" w l ls 2 notitle, \
+			"-" w l ls 3 lw 2 t "Mutiert", \
+			"-" w l ls 1 lw 2 t "Crossover", \
+			"-" w l ls 2 lw 2 t "Kopiert", \
+			"-" w p pt 5 ps 0.3 lc rgbcolor "black" notitle
+	'''.format(n + 0.5)
+
 	def lines(l):
 		for x1, y1, _, x2, y2, _ in l:
 			print x1, y1, '\n', x2, y2, '\n'
 		print 'e'
+	lines(mutate_lines)
 	lines(mate_lines)
 	lines(elite_lines)
+	lines(super_mutate_lines)
 	lines(super_mate_lines)
 	lines(super_elite_lines)
 	for gen in pop:
@@ -353,9 +419,10 @@ def one_spectrum(rule):
 	return fit, alpha, beta, data
 
 
-def spectrum(rule, width=1, height=1):
+def spectrum(rule, line=True, width=1, height=1):
 	width=int(width)
 	height=int(height)
+	line=bool(int(line))
 
 	print 'reset'
 	print 'set termoption enhanced'
@@ -363,12 +430,19 @@ def spectrum(rule, width=1, height=1):
 	print 'set yrange [0.0001:100]'
 	print 'set xrange [1:1500]'
 	print 'set x2range [1:1500]'
-	print 'set xtics out nomirror format "10^{%T}"'
-	print 'set ytics out nomirror format "10^{%T}"'
+	print 'set xtics out nomirror format "$10^{%T}$"'
+	print 'set ytics out nomirror format "$10^{%T}$"'
+	print 'set mxtics 10'
+	print 'set mytics 10'
 
-	print 'set x2tics scale 0 format "" (10, 100)'
-	print 'set style line 8 lt 1 lc rgbcolor "gray"'
-	print 'set grid x2 ls 8'
+	print 'set lmargin 6'
+	print 'set rmargin 1'
+	print 'set bmargin 2'
+
+	if line:
+		print 'set x2tics scale 0 format "" (10, 100)'
+		print 'set style line 8 lt 1 lc rgbcolor "gray"'
+		print 'set grid x2 ls 8'
 
 	print 'set border 3'
 	print 'unset key'
@@ -378,15 +452,20 @@ def spectrum(rule, width=1, height=1):
 
 	for i in range(width * height):
 		fit, alpha, beta, data = one_spectrum(rule)
-		print 'set title "{{/Symbol a}}={0:.4f} {{/Symbol b}}={1:.4f} f={2:.2f}" enhanced'.format(alpha, beta, fit)
+		if line:
+			lx = 10
+			ly = exp(alpha + beta * log(lx))
+			print r'set label 1 "$\\mathrm{{e}}^{{{0:.2f}}} \\, f^{{{1:.2f}}}$" at first {2}, first {3} textcolor rgbcolor "red" front offset 1,1'.format(alpha, beta, lx, ly)
 
 		print 'plot ',
-		print '"-" volatile w filledcu lc rgbcolor "red", ',
-		print 'exp({0} + {1} * log(x)) w l lw 2 lc rgbcolor "red", '.format(alpha, beta),
-		print '"-" volatile using ($0 + 1):1 w p pt 5 ps 0.2 lc rgbcolor "black"'
-		for x, y in enumerate(data[:100], 1):
-			print x, y, exp(alpha + beta * log(x)) 
-		print 'e'
+		if line:
+			print '"-" volatile w filledcu lc rgbcolor "red", ',
+			print r'exp({0} + {1} * log(x)) w l lw 3 lc rgbcolor "red", '.format(alpha, beta),
+		print '"-" volatile using ($0 + 1):1 w p pt 5 ps 0.4 lc rgbcolor "black"'
+		if line:
+			for x, y in enumerate(data[:100], 1):
+				print x, y, exp(alpha + beta * log(x)) 
+			print 'e'
 		print '\n'.join(data)
 		print 'e'
 

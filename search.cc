@@ -43,18 +43,41 @@ void show_info(bitset<length> rule, Random random) {
 }
 
 
+template<size_t width, size_t height, size_t length, typename Random>
+void run_once(bitset<length> rule, Random random) {
+	// run once
+#if 0
+	bitset<width> init;
+	init[width/2] = true;
+	const auto lines = eval<width, height>(rule, init);
+#else
+	const auto lines = eval<width, height>(rule, initial<width>(random));
+#endif
+
+	// print lines
+	for(size_t y = 0 ; y < height ; y++) {
+		for(size_t x = 0 ; x < width ; x++)
+			cout << (lines[y][x] ? '1' : '0') << ' ';
+		cout << '\n';
+	}
+}
+
+
 
 int main(int argc, char **argv) {
+	unsigned int seed = 0;
 	size_t generations;
 	string directory, rule_info;
 	options_description desc("Usage: " + string(argv[0]) + " [options]\nOptions");
 	desc.add_options()
 		("help", "Show this message.")
 		("info", value<string>(&rule_info), "Calculate the frequency profile/score of one rule for one initial configuration.")
+		("run", value<string>(&rule_info), "Run one rule for one initial configuration.")
 		("name", value<string>(&directory), "Batch input/output folder name.")
 		("generations", value<size_t>(&generations)->default_value(200), "Batch run for this many generations.")
 		("mutation", value<double>(&mutation_prob)->default_value(0.05), "Probability of mutating=flipping one child bit.")
 		("crossover", value<double>(&crossover_prob)->default_value(0.6), "Uniform crossover proportion.")
+		("seed", value<unsigned int>(&seed)->default_value(0), "Explicit seed value.")
 		;
 	positional_options_description pos;
 	pos.add("name", 1);
@@ -78,17 +101,29 @@ int main(int argc, char **argv) {
 	typedef bitset<32> rule_t;
 
 	// create and seed RNG
-	random_device dev;
-	mt19937 random(dev());
+	if(seed == 0) {
+		random_device dev;
+		seed = dev();
+	}
+	mt19937 random(seed);
 
 	if(vm.count("info")) { // show info
-
 		switch(rule_info.size()) {
 			case 32:
 				show_info<width, height>(bitset<32>(rule_info), random);
 				break;
 			case 8:
 				show_info<width, height>(bitset<8>(rule_info), random);
+				break;
+		}
+	} else if(vm.count("run")) { // run once
+		const size_t width = 1024/4, height = 640/4;
+		switch(rule_info.size()) {
+			case 32:
+				run_once<width, height>(bitset<32>(rule_info), random);
+				break;
+			case 8:
+				run_once<width, height>(bitset<8>(rule_info), random);
 				break;
 		}
 

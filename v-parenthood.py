@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # encoding=utf-8
+from __future__ import division
 from visualize import *
 
 def parenthood(name):
@@ -30,11 +31,11 @@ def parenthood(name):
 		set key left top samplen 1
 		unset border
 		unset ytics
-		set xtics scale 0 font ",8"
-		set xrange [-0.5:{0}]
+		set xtics scale 0 font ",10"
+		set xrange [-0.25:{0}+0.25]
 		set yrange [0:*]
-		set xlabel "Generation" font ",8"
-		set ylabel "Fitness →" font ",8"
+		set xlabel "Generation" font ",10"
+		set ylabel "Fitness →" font ",10"
 		set style line 1 lw 0.25 lc rgbcolor "#0000ee"
 		set style line 3 lw 0.25 lc rgbcolor "#00ee00"
 		set style line 2 lw 0.75 lc rgbcolor "#ee0000"
@@ -46,8 +47,8 @@ def parenthood(name):
 			"-" w l ls 3 lw 2 t "Mutiert", \
 			"-" w l ls 1 lw 2 t "Crossover", \
 			"-" w l ls 2 lw 2 t "Kopiert", \
-			"-" w p pt 5 ps 0.3 lc rgbcolor "black" notitle
-	'''.format(n + 0.5)
+			"-" w p pt 6 ps 0.4 lc rgbcolor "black" notitle
+	'''.format(n)
 
 	def lines(l):
 		for x1, y1, _, x2, y2, _ in l:

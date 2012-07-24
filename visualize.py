@@ -6,15 +6,17 @@ from glob import glob
 import sys
 import os.path
 from numpy import *
-from random import random
+import numpy.random as nr
 from operator import itemgetter
 from subprocess import check_output
+
+nr.seed(123)
 
 ALL = 160
 ELITE = 20
 
 def jitter(d = 2):
-	return (random() - 0.5) / d
+	return (nr.random() - 0.5) / d
 
 def read_one_pop(f, limit):
 	gen = []
@@ -68,22 +70,28 @@ def read_gen(name):
 			if len(gen) > 0:
 				yield gen
 
-
 def smooth(points, window=1+2*25):
 	if window == 0:
 		return list(points)
 	w = hanning(window)
-	data = [points[0]] * window + points + [points[-1]] * window
+	#data = [points[0]] * window + points + [points[-1]] * window
+	data = [0.0] * window + points + list(reversed(points[-window:]))
 	out = convolve(w / sum(w), data, 'same')
+	#return out[window:-window]
 	return out[window:-window]
 
-
 def binstring(s):
-	return s.replace('0','.').replace('1','▮')
+	#return s.replace('0','.').replace('1','▮')
+	return s.replace('0','□').replace('1','■')
 
+def easyrule(s):
+	if s[0] == 'r':
+		return bin(int(s[1:]))[2:].rjust(8, '0')
+	else:
+		return s
 
-def one_spectrum(rule):
-	out = check_output(['./search', '--info', rule])
+def one_spectrum(rule, seed=20):
+	out = check_output(['./search', '--info', rule, '--seed', str(seed)])
 	out = out.split('\n')
 	fit, alpha, beta = map(float, out[0].split())
 	data = out[3:]

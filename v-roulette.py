@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import division
 from visualize import *
 
 def roulette(name):
@@ -46,7 +47,7 @@ def roulette(name):
 	r1 = 0.7
 	r2 = 0.78
 	for i in range(ALL):
-		x = random() * (2 * pi)
+		x = nr.random() * (2 * pi)
 		print r1 * sin(x), r1 * cos(x)
 		print r2 * sin(x), r2 * cos(x)
 		print

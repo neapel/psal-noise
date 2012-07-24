@@ -1,43 +1,98 @@
 #!/usr/bin/env python
+# encoding=utf-8
+from __future__ import division
 from visualize import *
 
-def profile(ptype, name):
-	profiles = []
-	for g in read_pop(name):
-		p = []
-		for i in g:
-			p.append(array(map(int, i[0])))
-		p = vstack(p)
-		if ptype == 'mean':
-			profiles.append(mean(p, 0))
-		else:
-			profiles.append(var(p, 0))
-	profiles = vstack(profiles)
-	print 'reset'
-	print 'set palette rgb 31,13,10'
+def profile(name):
+	GENS = 200
+	DETAIL = 40
 
-	print 'set rmargin 10'
-	if ptype == 'mean':
-		print 'set palette rgb 9,13,-9'
-		print 'set cbtics scale 0 ("{0}" 0, "{1}" 1)'.format(*map(binstring, '01'))
-	else:
-		print 'set palette rgb -7,-7,-7'
-		print 'set cbtics scale 0 ("0" 0, "0.25" 0.25)'
-	h = 0.125
-	print 'set colorbox user noborder origin graph 1.01, graph {0} size character 2, graph {1}'.format((1-h)/2, h)
-	print 'set yrange [-0.5:31.5]'
-	print 'set lmargin 8'
-	print 'unset border'
-	print 'set ytics scale 0 ({0}) font "Monospace"'.format(','.join([
+	profiles = zeros((32, GENS))
+	fitness = zeros(GENS)
+	for i, g in zip(range(GENS), read_pop(name, ALL)):
+		profile = zeros((32, len(g)))
+		fit = zeros(len(g))
+		for j, r in enumerate(g):
+			profile[:,j] = array(map(int, reversed(r[0])))
+			fit[j] = r[1]
+		profiles[:,i] = mean(profile, 1)
+		fitness[i] = mean(fit[:ELITE])
+
+	def dump(m):
+		print '\n'.join([' '.join(map(str, line)) for line in m]), '\ne\ne'
+
+	print '''
+		reset
+		unset key
+		set palette defined (0 "white", 0.25 "#cccccc", 0.5 "#cc4444", 0.75 "#444444", 1 "black")
+		unset colorbox
+		unset border
+		set yrange [-0.5:31.5]
+		set xtics out nomirror font ",10"
+		set multiplot
+		set style line 1 lw 1 lc rgbcolor "black"
+		H = 0.8
+		FITM = {0}
+		DETAIL = {1}
+	'''.format(5 * ceil(fitness.max() / 5), DETAIL)
+
+
+	# detail
+	print '''
+		set size 0.5,H
+		set origin 0,0
+		set xrange [0-0.5:DETAIL+0.5]
+		set lmargin 12
+		set rmargin 0
+		set ytics scale 0 ({0}) font ",10"
+		set label 1 "Generation" font ",10" at graph 0, graph 0 right offset -1,-1.4
+		plot "-" matrix w image
+	'''.format(','.join([
 		'"{0}" {1}'.format(binstring(bin(i)[2:].rjust(5,'0')), i)
 		for i in range(32)
 	]))
-	print 'set xrange [0:200]'
-	print 'set xtics out nomirror'
-	print 'plot "-" matrix w image'
-	print '\n'.join([' '.join(map(str, line)) for line in reversed(transpose(profiles))])
-	print 'e'
-	print 'e'
+	dump(profiles[:,:DETAIL + 1])
+
+	print '''
+		unset label 1
+		set size 0.5,(1-H)
+		set origin 0,H
+		unset xtics
+		set ylabel "Fitness →" font ",10"
+		unset ytics
+		set bmargin 0
+		set yrange [0:FITM]
+		plot "-" w l ls 1
+	'''
+	print '\n'.join(map(str, fitness[:DETAIL+2])), '\ne'
+
+
+	# rest
+	print '''
+		set size 0.5,H
+		set origin 0.5,0
+		set lmargin 0
+		unset bmargin
+		unset rmargin
+		unset ylabel
+		set xtics out nomirror font ",10"
+		set xrange [DETAIL+0.5:200-0.5]
+		set yrange [-0.5:31.5]
+		plot "-" matrix using ($1 + DETAIL):2:3 w image
+	'''
+	dump(profiles[:,DETAIL:])
+
+	print '''
+		set size 0.5,(1-H)
+		set origin 0.5,H
+		set bmargin 0
+		unset xtics
+		set yrange [0:FITM]
+		plot "-" using ($0 + DETAIL):1 w l ls 1
+	'''
+	print '\n'.join(map(str, fitness[DETAIL+1:])), '\ne'
+
+	print 'unset multiplot'
 
 if __name__ == '__main__':
 	profile(*sys.argv[1:])

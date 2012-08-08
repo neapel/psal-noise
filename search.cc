@@ -25,11 +25,14 @@ using namespace boost::filesystem;
 template<size_t width, size_t height, size_t length, typename Random>
 void show_info(bitset<length> rule, Random random) {
 	// run once
-	const auto lines = eval<width, height>(rule, initial<width>(random));
+	array<array<bool, width>, height> lines;
+	initial(random, lines[0]);
+	eval(rule, lines);
 
 	// calculate spectrum
-	plan_t<height, float> plan;
-	const auto spec = spectrum<height/2+1>(plan, lines);
+	plan_t plan(height);
+	array<float, height/2+1> spec;
+	spectrum(plan, lines, spec);
 
 	double fit, alpha, beta;
 	tie(fit, alpha, beta) = fitness<fit_w, resid_w>(spec);
@@ -51,7 +54,9 @@ void run_once(bitset<length> rule, Random random) {
 	init[width/2] = true;
 	const auto lines = eval<width, height>(rule, init);
 #else
-	const auto lines = eval<width, height>(rule, initial<width>(random));
+	array<array<bool,width>, height> lines;
+	initial(random, lines[0]);
+	eval(rule, lines);
 #endif
 
 	// print lines

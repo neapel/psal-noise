@@ -12,12 +12,14 @@
 const size_t fit_w = 10, resid_w = 100;
 
 template<size_t height, size_t width, size_t N, typename rule, typename plan_t>
-std::array<double, N> score_rule(plan_t &plan, const rule &r, const std::array<std::bitset<width>, N> &initials) {
+std::array<double, N> score_rule(plan_t &plan, const rule &r, const std::array<std::array<bool, width>, N> &initials, std::array<std::array<bool, width>, height> &lines) {
 	using namespace std;
 	array<double, N> fit;
+	array<float, resid_w> spec;
 	for(size_t i = 0 ; i < N ; i++) {
-		const auto lines = eval<width, height>(r, initials[i]);
-		const auto spec = spectrum<resid_w>(plan, lines);
+		lines[0] = initials[i];
+		eval(r, lines);
+		spectrum(plan, lines, spec);
 		fit[i] = get<0>(fitness<fit_w, resid_w>(spec));
 	}
 	return fit;
@@ -60,26 +62,26 @@ std::ostream &operator<<(std::ostream &o, const scored<rules> &s) {
 
 template<size_t width, size_t height, typename real>
 struct population_scorer {
-	typedef plan_t<height, real> _plan_t;
-	std::vector<_plan_t> plan;
+	std::vector<plan_t> plan;
 
 	population_scorer() {
 		for(int i = 0 ; i < omp_get_max_threads() ; i++)
-			plan.push_back(_plan_t());
+			plan.push_back(plan_t(height));
 	}
 
 	template<typename random, size_t population, size_t rules>
 	std::array<scored<rules>, population> operator()(random &gen, const std::array<std::bitset<rules>, population> &pop) {
 		using namespace std;
 		// first lines
-		array<bitset<width>, initial_N> initial_lines;
-		for(auto I = initial_lines.begin() ; I != initial_lines.end() ; I++) *I = initial<width>(gen);
+		array<array<bool, width>, initial_N> initial_lines;
+		for(auto I = initial_lines.begin() ; I != initial_lines.end() ; I++) initial(gen, *I);
 		// score the rules
 		array<scored<rules>, population> scores;
 		#pragma omp parallel for default(shared) schedule(static,40)
 		for(size_t i = 0 ; i < population ; i++) {
 			const size_t thread = omp_get_thread_num();
-			scores[i] = scored<rules>(pop[i], score_rule<height>(plan[thread], pop[i], initial_lines));
+			array<array<bool, width>, height> lines;
+			scores[i] = scored<rules>(pop[i], score_rule(plan[thread], pop[i], initial_lines, lines));
 			cerr << '|' << flush;
 		}
 		// sort by score

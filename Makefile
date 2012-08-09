@@ -1,4 +1,4 @@
-CXXFLAGS += -Wall -Wextra --std=c++0x -O3 -fopenmp -mtune=native -march=native
+CXXFLAGS += -Wall -Wextra --std=c++0x -O3 -fopenmp -mtune=native -march=native -fno-deduce-init-list
 packages = fftw3f
 CXXFLAGS += `pkg-config --cflags $(packages)`
 LDLIBS += `pkg-config --libs $(packages)` -lboost_filesystem -lboost_system -lboost_program_options
@@ -6,12 +6,10 @@ LDLIBS += `pkg-config --libs $(packages)` -lboost_filesystem -lboost_system -lbo
 all : search
 new : clean search
 
-headers=ca.hh gen.hh linear_fit.hh score.hh
-search : search.cc $(headers)
-info : info.cc $(headers)
+search : search.cc
 
 .PHONY : clean
 clean :
-	-rm search ca
+	-rm search
 
 

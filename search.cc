@@ -25,7 +25,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/multi_array.hpp>
 
 #include <fcntl.h>
 #include <fftw3.h>
@@ -37,8 +36,6 @@ using namespace std::chrono;
 using namespace boost;
 using namespace boost::program_options;
 using namespace boost::filesystem;
-
-using std::array;
 
 
 //## Cellular Automaton.
@@ -64,88 +61,81 @@ template<>
 struct rule_traits<8> { enum { neighbors = 3, delta = 1 }; };
 
 
-// Holds input (first line), output (rest).
-typedef multi_array<bool, 2> lines;
-
-
-// Evaluate the rule.
-template<size_t rules>
-void eval(lines &l, const bitset<rules> &r) {
-	const size_t neighbors = rule_traits<rules>::neighbors;
-	const size_t delta = rule_traits<rules>::delta;
-	const size_t w = l.shape()[1], h = l.shape()[0];
-	const auto rule = r.to_ulong();
-	// Evaluate each line.
-	for(size_t y = 1 ; y < h ; y++) {
-		auto prev = l[y - 1].origin(), curr = l[y].origin();
-		// fill index, evaluate first cell.
-		size_t index = 0;
-		for(size_t k = 0 ; k < neighbors ; k++)
-			index |= prev[(w + k - delta) % w] << k;
-		curr[0] = (rule >> index) & 1;
-		// evaluate next cells
-		for(size_t x = 1 ; x < w ; x++) {
-			// update index
-			index >>= 1;
-			index |= prev[(w + x + (neighbors - 1) - delta) % w] << (neighbors - 1);
-			curr[x] = (rule >> index) & 1;
-		}
-	}
-}
-
-
-struct plan_t {
-	typedef complex<float> C;
+struct spectrum_t {
+	size_t width, height;
+	bool *lines;
 	float *in;
-	C *out;
+	complex<float> *out;
 	fftwf_plan plan;
 
 	template<typename T> T *fftwf_new(size_t n) {
 		return reinterpret_cast<T *>(fftwf_malloc(n * sizeof(T)));
 	}
 
-	plan_t(size_t N) {
-		in = fftwf_new<float>(N);
-		out = fftwf_new<C>(N/2+1);
-		FILE *fi = fopen("fftwf.wisdom", "r");
+	spectrum_t(size_t width, size_t height)
+	: width(width), height(height),
+	  lines(new bool[width * height]),
+	  in(fftwf_new<float>(width * height)),
+	  out(fftwf_new<complex<float>>(width * (height/2+1))) {
+		
+		FILE *fi = fopen("fftwfm.wisdom", "r");
 		if(fi) { fftwf_import_wisdom_from_file(fi); fclose(fi); }
-		plan = fftwf_plan_dft_r2c_1d(N, in, reinterpret_cast<fftwf_complex *>(out), FFTW_EXHAUSTIVE);
-		FILE *fo = fopen("fftwf.wisdom", "w");
+
+		int N[] = {static_cast<int>(height)};
+		plan = fftwf_plan_many_dft_r2c(
+			/*rank*/1, /*n*/N, /*howmany*/width, in,
+			/*inembed*/nullptr, /*istride*/width, /*idist*/1,
+			reinterpret_cast<fftwf_complex *>(out),
+			/*onembed*/nullptr, /*ostride*/width, /*odist*/1,
+			FFTW_EXHAUSTIVE);
+		FILE *fo = fopen("fftwfm.wisdom", "w");
 		if(fo) { fftwf_export_wisdom_to_file(fo); fclose(fo); }
 	}
 
-	void operator()() {
+
+	// Evaluate the rule.
+	template<size_t rules>
+	void eval(const bitset<rules> &r) {
+		const size_t neighbors = rule_traits<rules>::neighbors;
+		const size_t delta = rule_traits<rules>::delta;
+		const auto rule = r.to_ulong();
+		// Evaluate each line.
+		for(size_t y = 1 ; y < height ; y++) {
+			auto prev = lines + ((y - 1) * width), curr = lines + (y * width);
+			// fill index, evaluate first cell.
+			size_t index = 0;
+			for(size_t k = 0 ; k < neighbors ; k++)
+				index |= prev[(width + k - delta) % width] << k;
+			curr[0] = (rule >> index) & 1;
+			// evaluate next cells
+			for(size_t x = 1 ; x < width ; x++) {
+				// update index
+				index >>= 1;
+				index |= prev[(width + x + (neighbors - 1) - delta) % width] << (neighbors - 1);
+				curr[x] = (rule >> index) & 1;
+			}
+		}
+	}
+
+
+	// Calculate the frequency spectrum of this array.
+	template<class Iterator>
+	void freq(Iterator begin, Iterator end) {
+		// convert input to float.
+		copy(lines, lines + width * height, in);
+		// transform columns.
 		fftwf_execute(plan);
+		// sum columns.
+		auto I = begin;
+		for(size_t y = 1 ; y != height && I != end ; y++, I++) {
+			float sum = 0;
+			for(size_t x = 0 ; x != width ; x++)
+				sum += norm(out[y * width + x] / float(height));
+			*I = sum;
+		}
 	}
 };
 
-
-// Calculate the frequency spectrum of this array.
-template<class Iterator>
-void spectrum(const lines &l, plan_t &plan, Iterator begin, Iterator end) {
-	const size_t w = l.shape()[1], h = l.shape()[0];
-	fill(begin, end, 0);
-	for(size_t x = 0 ; x < w ; x++) {
-		// One column
-		for(size_t y = 0 ; y < h ; y++)
-			plan.in[y] = l.origin()[y * w + x];
-		// Run forward fourier for column
-		plan();
-		// Sum up spectrum
-		auto O = plan.out + 1;
-		for(auto I = begin ; I != end ; I++, O++)
-			*I += norm(*O / float(h));
-	}
-}
-
-
-// Create an initial configuration: Random uniform distribution of 0 and 1.
-template<class random, class Iterator>
-void initial(random &gen, Iterator begin, Iterator end) {
-	bernoulli_distribution bit;
-	for(auto I = begin ; I != end ; I++)
-		*I = bit(gen);
-}
 
 
 //## Fitness calculation.
@@ -207,6 +197,7 @@ tuple<double, double, double> fitness(Iterator begin, Iterator end, size_t fit) 
 
 //## Scoring
 
+// a scored rule.
 template<class Rule>
 struct scored {
 	Rule the_rule;
@@ -223,40 +214,58 @@ struct scored {
 
 template<class Rule>
 ostream &operator<<(ostream &o, const scored<Rule> &s) {
-	o << s.the_rule.to_string() << ' ' << s.avg_score << '\t';
-	for(auto I = s.scores.begin() ; I != s.scores.end() ; I++)
-		o << *I << ' ';
+	o << s.the_rule.to_string();
+	if(s.avg_score >= 0) {
+		o << ' ' << s.avg_score << '\t';
+		for(auto x : s.scores) o << x << ' ';
+	}
 	return o;
 }
 
 
+// scores and sorts the given rules.
 struct population_scorer {
-	vector<plan_t> plan;
-	size_t width, height, initials, resid, fit;
+	vector<spectrum_t> spectrum;
+	size_t width, initials, resid, fit;
 
-	population_scorer(size_t w, size_t h, size_t in, size_t r, size_t f) : width(w), height(h), initials(in), resid(r), fit(f) {
+	population_scorer(size_t w, size_t h, size_t in, size_t r, size_t f) : width(w), initials(in), resid(r), fit(f) {
 		for(int i = 0 ; i < omp_get_max_threads() ; i++)
-			plan.push_back(plan_t(height));
+			spectrum.push_back(spectrum_t(w, h));
 	}
 
 	template<class Random, class Iterator>
 	void operator()(Random &gen, Iterator begin, Iterator end) {
-		for(auto I = begin ; I != end ; I++) I->scores.reserve(initials);
+		// reserve places for scores
+		for(auto I = begin ; I != end ; I++) {
+			I->scores.clear();
+			fill_n(back_inserter(I->scores), initials, -1);
+		}
 
-		#pragma omp parallel for
+		// create initial lines
+		bool *start = new bool[initials * width];
+		bernoulli_distribution bit;
+		generate(start, start + initials * width, [&]{return bit(gen);});
+
+		#pragma omp parallel for schedule(dynamic)
 		for(size_t i = 0 ; i < initials ; i++) {
+			// initialize this thread's automaton
 			const size_t thread = omp_get_thread_num();
-			lines l(extents[height][width]);
-			initial(gen, l[0].begin(), l[0].end());
+			auto spect = spectrum.at(thread);
+			copy(start + i * width, start + (i + 1) * width, spect.lines);
 			float spec[resid];
 
+			// score each rule.
 			for(auto I = begin ; I != end ; I++) {
-				eval(l, I->the_rule);
-				spectrum(l, plan[thread], spec, spec + resid);
-				I->scores[i] = get<0>(fitness(spec, spec + resid, fit));
+				spect.eval(I->the_rule);
+				spect.freq(spec, spec + resid);
+				auto f = get<0>(fitness(spec, spec + resid, fit));
+				I->scores[i] = f;
 			}
 		}
 
+		delete[] start;
+
+		// sort by average score.
 		for(auto I = begin ; I != end ; I++)
 			I->avg_score = average(I->scores.begin(), I->scores.end());
 		sort(begin, end);
@@ -398,17 +407,17 @@ struct genetic_algorithm {
 template<class Random, class Rule>
 void run_once(Random &gen, const Rule &r, size_t width, size_t height, bool do_spectrum, bool dump) {
 	// run once
-	lines l(extents[height][width]);
-	initial(gen, l[0].begin(), l[0].end());
-	eval(l, r);
+	spectrum_t spectrum(width, height);
+	bernoulli_distribution bit;
+	generate(spectrum.lines, spectrum.lines + width, [&]{return bit(gen);});	
+	spectrum.eval(r);
 
 	if(do_spectrum) {
 		const size_t residN = 100, fitN = 10;
 
 		// calculate spectrum
-		plan_t plan(height);
 		float spec[height/2 + 1];
-		spectrum(l, plan, spec, spec + (height/2 + 1));
+		spectrum.freq(spec, spec + (height/2 + 1));
 
 		double fit, alpha, beta;
 		tie(fit, alpha, beta) = fitness(spec, spec + residN, fitN);
@@ -424,7 +433,7 @@ void run_once(Random &gen, const Rule &r, size_t width, size_t height, bool do_s
 		// print lines
 		for(size_t y = 0 ; y < height ; y++) {
 			for(size_t x = 0 ; x < width ; x++)
-				cout << (l[y][x] ? '1' : '0') << ' ';
+				cout << (spectrum.lines[y * width + x] ? '1' : '0') << ' ';
 			cout << '\n';
 		}
 	}

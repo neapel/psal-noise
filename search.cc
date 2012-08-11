@@ -18,7 +18,6 @@
 #include <chrono>
 #include <random>
 
-#define BOOST_FILESYSTEM_VERSION 2
 #define BOOST_DISABLE_ASSERTS 1
 
 #include <boost/program_options.hpp>

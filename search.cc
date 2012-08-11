@@ -74,11 +74,11 @@ struct spectrum_t {
 
 	spectrum_t(size_t width, size_t height)
 	: width(width), height(height),
-	  lines(new bool[width * height]),
+	  lines(fftwf_new<bool>(width * height)),
 	  in(fftwf_new<float>(width * height)),
 	  out(fftwf_new<complex<float>>(width * (height/2+1))) {
-		
-		FILE *fi = fopen("fftwfm.wisdom", "r");
+		auto path = str(format("fftwm-w%d-h%d.wisdom") % width % height);
+		FILE *fi = fopen(path.c_str(), "r");
 		if(fi) { fftwf_import_wisdom_from_file(fi); fclose(fi); }
 
 		int N[] = {static_cast<int>(height)};
@@ -88,7 +88,7 @@ struct spectrum_t {
 			reinterpret_cast<fftwf_complex *>(out),
 			/*onembed*/nullptr, /*ostride*/width, /*odist*/1,
 			FFTW_EXHAUSTIVE);
-		FILE *fo = fopen("fftwfm.wisdom", "w");
+		FILE *fo = fopen(path.c_str(), "w");
 		if(fo) { fftwf_export_wisdom_to_file(fo); fclose(fo); }
 	}
 
@@ -111,7 +111,7 @@ struct spectrum_t {
 			for(size_t x = 1 ; x < width ; x++) {
 				// update index
 				index >>= 1;
-				index |= prev[(width + x + (neighbors - 1) - delta) % width] << (neighbors - 1);
+				index |= prev[(x + (neighbors - 1 - delta)) % width] << (neighbors - 1);
 				curr[x] = (rule >> index) & 1;
 			}
 		}
@@ -126,12 +126,13 @@ struct spectrum_t {
 		// transform columns.
 		fftwf_execute(plan);
 		// sum columns.
+		assert(end <= begin + height/2 + 1);
 		auto I = begin;
-		for(size_t y = 1 ; y != height && I != end ; y++, I++) {
+		for(auto out_row = out ; I != end ; I++, out_row += width) {
 			float sum = 0;
-			for(size_t x = 0 ; x != width ; x++)
-				sum += norm(out[y * width + x] / float(height));
-			*I = sum;
+			for(auto x = out_row ; x != out_row + width ; x++)
+				sum += norm(*x);
+			*I = sum / pow(height, 2);
 		}
 	}
 };

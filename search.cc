@@ -356,7 +356,7 @@ struct genetic_algorithm {
 		std::array<bool, N> r;
 		r.fill(false);
 		for(size_t i = 1 ; i <= lambda && i < N ; i++) r[i] = true;
-		random_shuffle(r.begin() + 1, r.end(), [&gen](ptrdiff_t x){
+		random_shuffle(r.begin() + 1, r.end(), [&](ptrdiff_t x){
 			return uniform_int_distribution<ptrdiff_t>(0, x - 1)(gen);
 		});
 		bitset<N> b;

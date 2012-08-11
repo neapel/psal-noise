@@ -607,6 +607,21 @@ int main(int argc, char **argv) {
 		if(pop.size() == 0)
 			ga.initial_population(back_inserter(pop), population);
 
+		// dump parameters
+		{
+			ofstream params(directory + "/parameters");
+			params
+				<< " --name" << directory
+				<< " --width " << width
+				<< " --height " << height
+				<< " --initials " << initials
+				<< " --resid " << resid
+				<< " --fit " << fit
+				<< " --mutation " << mutation_prob
+				<< " --crossover " << crossover_prob
+				<< " --seed " << seed << endl;
+		}
+
 		// run
 		for(size_t g = 0 ; g < generations ; g++) {
 			const size_t this_gen = g + start_gen;
@@ -630,6 +645,10 @@ int main(int argc, char **argv) {
 			ofstream next_pop_out(str(pop_fmt % directory % (this_gen + 1)));
 			next_pop_out << pop << endl;
 		}
+
+	} else {
+		cerr << desc;
+		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;

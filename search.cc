@@ -62,16 +62,18 @@ struct rule_traits<8> { enum { neighbors = 3, delta = 1 }; };
 
 
 struct spectrum_t {
+	private:
 	size_t width, height;
 	bool *lines;
 	float *in;
 	complex<float> *out;
 	fftwf_plan plan;
 
-	template<typename T> T *fftwf_new(size_t n) {
+	template<typename T> static T *fftwf_new(size_t n) {
 		return reinterpret_cast<T *>(fftwf_malloc(n * sizeof(T)));
 	}
 
+	public:
 	spectrum_t(size_t width, size_t height)
 	: width(width), height(height),
 	  lines(fftwf_new<bool>(width * height)),
@@ -90,6 +92,14 @@ struct spectrum_t {
 			FFTW_EXHAUSTIVE);
 		FILE *fo = fopen(path.c_str(), "w");
 		if(fo) { fftwf_export_wisdom_to_file(fo); fclose(fo); }
+	}
+
+
+	// Initialize the first line.
+	template<class Iterator>
+	void init(Iterator i) {
+		for(size_t x = 0 ; x < width ; x++)
+			lines[x] = *i++;
 	}
 
 
@@ -157,7 +167,22 @@ struct spectrum_t {
 			*I = sum / pow(height, 2);
 		}
 	}
+
+
+	// Dump lines
+	void dump(ostream &o) const {
+		for(size_t y = 0 ; y < height ; y++) {
+			for(size_t x = 0 ; x < width ; x++)
+				o << (lines[y * width + x] ? '1' : '0') << ' ';
+			o << '\n';
+		}
+	}
 };
+
+ostream &operator <<(ostream &o, const spectrum_t &s) {
+	s.dump(o);
+	return o;
+}
 
 
 
@@ -274,7 +299,7 @@ struct population_scorer {
 			// initialize this thread's automaton
 			const size_t thread = omp_get_thread_num();
 			auto spect = spectrum.at(thread);
-			copy(start + i * width, start + (i + 1) * width, spect.lines);
+			spect.init(start + i * width);
 			float spec[resid];
 
 			// score each rule.
@@ -432,7 +457,9 @@ void run_once(Random &gen, const Rule &r, size_t width, size_t height, bool do_s
 	// run once
 	spectrum_t spectrum(width, height);
 	bernoulli_distribution bit;
-	generate(spectrum.lines, spectrum.lines + width, [&]{return bit(gen);});	
+	bool init[width];
+	generate(init, init + width, [&]{return bit(gen);});	
+	spectrum.init(init);
 	spectrum.eval(r);
 
 	if(do_spectrum) {
@@ -454,11 +481,7 @@ void run_once(Random &gen, const Rule &r, size_t width, size_t height, bool do_s
 
 	if(dump) {
 		// print lines
-		for(size_t y = 0 ; y < height ; y++) {
-			for(size_t x = 0 ; x < width ; x++)
-				cout << (spectrum.lines[y * width + x] ? '1' : '0') << ' ';
-			cout << '\n';
-		}
+		cout << spectrum;
 	}
 }
 

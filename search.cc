@@ -99,22 +99,44 @@ struct spectrum_t {
 		const size_t neighbors = rule_traits<rules>::neighbors;
 		const size_t delta = rule_traits<rules>::delta;
 		const auto rule = r.to_ulong();
+#if 0
+		// Evaluate naively.
+		for(size_t y = 1 ; y < height ; y++) {
+			const auto curr = lines + (y * width), prev = curr - width;
+			for(size_t x = 0 ; x < width ; x++) {
+				size_t index = 0;
+				for(size_t k = 0 ; k < neighbors ; k++)
+					index |= prev[(width + x + k - delta) % width] << k;
+				curr[x] = (rule >> index) & 1;
+			}
+		}
+#else
 		// Evaluate each line.
 		for(size_t y = 1 ; y < height ; y++) {
-			auto prev = lines + ((y - 1) * width), curr = lines + (y * width);
+			const auto start = lines + (y * width), end = start + width;
+			auto curr = start, prev = start - width;
 			// fill index, evaluate first cell.
 			size_t index = 0;
 			for(size_t k = 0 ; k < neighbors ; k++)
 				index |= prev[(width + k - delta) % width] << k;
-			curr[0] = (rule >> index) & 1;
+			*curr++ = (rule >> index) & 1;
+			prev += neighbors - delta;
 			// evaluate next cells
-			for(size_t x = 1 ; x < width ; x++) {
+			while(prev != start) {
 				// update index
 				index >>= 1;
-				index |= prev[(x + (neighbors - 1 - delta)) % width] << (neighbors - 1);
-				curr[x] = (rule >> index) & 1;
+				index |= *prev++ << (neighbors - 1);
+				*curr++ = (rule >> index) & 1;
+			}
+			prev -= width;
+			// evaluate wrapping cells
+			while(curr != end) {
+				index >>= 1;
+				index |= *prev++ << (neighbors - 1);
+				*curr++ = (rule >> index) & 1;
 			}
 		}
+#endif
 	}
 
 

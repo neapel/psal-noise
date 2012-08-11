@@ -158,12 +158,13 @@ struct spectrum_t {
 		fftwf_execute(plan);
 		// sum columns.
 		assert(end <= begin + height/2 + 1);
-		auto I = begin;
-		for(auto out_row = out ; I != end ; I++, out_row += width) {
+		auto row = out + width; // skip first row.
+		const auto scale = 1 / pow(height, 2);
+		for(auto I = begin ; I != end ; I++, row += width) {
 			float sum = 0;
-			for(auto x = out_row ; x != out_row + width ; x++)
-				sum += norm(*x);
-			*I = sum / pow(height, 2);
+			for(size_t x = 0 ; x < width ; x++)
+				sum += norm(row[x]);
+			*I = sum * scale;
 		}
 	}
 

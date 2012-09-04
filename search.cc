@@ -345,12 +345,14 @@ struct genetic_algorithm {
 	double mutation_prob;
 	// Probability for crossover to happen at all
 	double crossover_prob;
-
+	// Number of elite rules to be copied
 	size_t elite;
+	// minimum (inclusive) and maximum (exclusive) lambda value for initials
+	size_t lambda_min, lambda_max;
 
 	Random &gen;
 
-	genetic_algorithm(double mp, double cp, size_t e, Random &g) : mutation_prob(mp), crossover_prob(cp), elite(e), gen(g) {}
+	genetic_algorithm(double mp, double cp, size_t e, size_t lambda_min, size_t lambda_max, Random &g) : mutation_prob(mp), crossover_prob(cp), elite(e), lambda_min(lambda_min), lambda_max(lambda_max), gen(g) {}
 
 
 	// Generate a random rule in which `lambda` bits are 1.
@@ -372,7 +374,7 @@ struct genetic_algorithm {
 	template<class OutputIterator>
 	void initial_population(OutputIterator out, size_t count) {
 		set<bitset<N>> pop;
-		uniform_int_distribution<size_t> lambda(1, N/2);
+		uniform_int_distribution<size_t> lambda(lambda_min, lambda_max);
 		while(pop.size() < count)
 			pop.insert(rule_from_lambda(lambda(gen)));
 		copy(pop.begin(), pop.end(), out);
@@ -491,7 +493,7 @@ int main(int argc, char **argv) {
 	// Parameters.
 	typedef mt19937 Random;
 	unsigned int seed;
-	size_t generations, width, height, population, elite, initials, resid, fit;
+	size_t generations, width, height, population, elite, initials, resid, fit, lambda_min, lambda_max;
 	string directory, rule_info;
 	double mutation_prob, crossover_prob, initials_density;
 	typedef bitset<32> rule_t;
@@ -523,6 +525,10 @@ int main(int argc, char **argv) {
 		 "Batch run for this many generations.")
 		("population", value(&population)->default_value(160),
 		 "Size of the rule-population.")
+		("lambda-min", value(&lambda_min)->default_value(1),
+		 "Minimum (inclusive) value of lambda for initial population.")
+		("lambda-max", value(&lambda_max)->default_value(17),
+		 "Maximum (exclusive) value of lambda for initial population.")
 		("elite", value(&elite)->default_value(20),
 		 "Number of rules to copy without mutation.")
 		("mutation", value(&mutation_prob)->default_value(0.05),
@@ -578,7 +584,7 @@ int main(int argc, char **argv) {
 		// parallel scorer
 		population_scorer scorer(width, height, initials, resid, fit, initials_density);
 		// genetic algorithm
-		genetic_algorithm<32, Random> ga(mutation_prob, crossover_prob, elite, random);
+		genetic_algorithm<32, Random> ga(mutation_prob, crossover_prob, elite, lambda_min, lambda_max, random);
 
 		format pop_fmt("%s/%05d.pop");
 		format gen_fmt("%s/%05d.gen");

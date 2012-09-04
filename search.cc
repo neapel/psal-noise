@@ -83,6 +83,7 @@ struct spectrum_t {
 		if(fi) { fftwf_import_wisdom_from_file(fi); fclose(fi); }
 
 		int N[] = {static_cast<int>(height)};
+		fftwf_set_timelimit(60); // max 1 minute
 		plan = fftwf_plan_many_dft_r2c(
 			/*rank*/1, /*n*/N, /*howmany*/width, in,
 			/*inembed*/nullptr, /*istride*/width, /*idist*/1,
@@ -275,8 +276,9 @@ ostream &operator<<(ostream &o, const scored<Rule> &s) {
 struct population_scorer {
 	vector<spectrum_t> spectrum;
 	size_t width, initials, resid, fit;
+	float initials_density;
 
-	population_scorer(size_t w, size_t h, size_t in, size_t r, size_t f) : width(w), initials(in), resid(r), fit(f) {
+	population_scorer(size_t w, size_t h, size_t in, size_t r, size_t f, float id) : width(w), initials(in), resid(r), fit(f), initials_density(id) {
 		for(int i = 0 ; i < omp_get_max_threads() ; i++)
 			spectrum.push_back(spectrum_t(w, h));
 	}
@@ -291,7 +293,7 @@ struct population_scorer {
 
 		// create initial lines
 		bool *start = new bool[initials * width];
-		bernoulli_distribution bit;
+		bernoulli_distribution bit(initials_density);
 		generate(start, start + initials * width, [&]{return bit(gen);});
 
 		#pragma omp parallel for schedule(dynamic)
@@ -453,18 +455,16 @@ struct genetic_algorithm {
 
 // Run the rule once, diagnostic output.
 template<class Random, class Rule>
-void run_once(Random &gen, const Rule &r, size_t width, size_t height, bool do_spectrum, bool dump) {
+void run_once(Random &gen, const Rule &r, size_t width, size_t height, bool do_spectrum, bool dump, size_t residN, size_t fitN, float initials_density) {
 	// run once
 	spectrum_t spectrum(width, height);
-	bernoulli_distribution bit;
+	bernoulli_distribution bit(initials_density);
 	bool init[width];
 	generate(init, init + width, [&]{return bit(gen);});	
 	spectrum.init(init);
 	spectrum.eval(r);
 
 	if(do_spectrum) {
-		const size_t residN = 100, fitN = 10;
-
 		// calculate spectrum
 		float spec[height/2 + 1];
 		spectrum.freq(spec, spec + (height/2 + 1));
@@ -493,7 +493,7 @@ int main(int argc, char **argv) {
 	unsigned int seed;
 	size_t generations, width, height, population, elite, initials, resid, fit;
 	string directory, rule_info;
-	double mutation_prob, crossover_prob;
+	double mutation_prob, crossover_prob, initials_density;
 	typedef bitset<32> rule_t;
 
 	// Parse options.
@@ -509,6 +509,8 @@ int main(int argc, char **argv) {
 		 "Batch input/output folder name.")
 		("initials", value(&initials)->default_value(10),
 		 "Number of initial configurations used to evaluate fitness.")
+		("density", value(&initials_density)->default_value(0.5),
+		 "Density of 1s in initials, 0=all 0s, 1=all 1s.")
 		("resid", value(&resid)->default_value(100),
 		 "Number of residual values used to calculate fitness.")
 		("fit", value(&fit)->default_value(10),
@@ -555,27 +557,26 @@ int main(int argc, char **argv) {
 	if(vm.count("info")) { // show info
 		switch(rule_info.size()) {
 			case 32:
-				run_once(random, bitset<32>(rule_info), width, height, true, false);
+				run_once(random, bitset<32>(rule_info), width, height, true, false, resid, fit, initials_density);
 				break;
 			case 8:
-				run_once(random, bitset<8>(rule_info), width, height, true, false);
+				run_once(random, bitset<8>(rule_info), width, height, true, false, resid, fit, initials_density);
 				break;
 		}
 	} else if(vm.count("run")) { // run once
-		const size_t width = 1024/4, height = 640/4;
 		switch(rule_info.size()) {
 			case 32:
-				run_once(random, bitset<32>(rule_info), width, height, false, true);
+				run_once(random, bitset<32>(rule_info), width, height, false, true, resid, fit, initials_density);
 				break;
 			case 8:
-				run_once(random, bitset<8>(rule_info), width, height, false, true);
+				run_once(random, bitset<8>(rule_info), width, height, false, true, resid, fit, initials_density);
 				break;
 		}
 
 	} else if(vm.count("name")) { // batch run
 
 		// parallel scorer
-		population_scorer scorer(width, height, initials, resid, fit);
+		population_scorer scorer(width, height, initials, resid, fit, initials_density);
 		// genetic algorithm
 		genetic_algorithm<32, Random> ga(mutation_prob, crossover_prob, elite, random);
 

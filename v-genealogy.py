@@ -35,7 +35,7 @@ def genealogy(name):
 	new_elite = []
 
 	print 'reset'
-	print 'set key left top samplen 1'
+	print 'set key left top samplen 0.5'
 	print 'unset border'
 	print 'unset ytics'
 	print 'set xtics scale 0 font ",8"'

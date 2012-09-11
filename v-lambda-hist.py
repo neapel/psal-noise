@@ -6,6 +6,7 @@ from visualize import *
 def lambda_hist(*names):
 	GENS = 200
 	DETAIL = 40
+	TOP = ALL
 
 	def read(top):
 		lambdas = zeros((33, GENS))
@@ -15,64 +16,51 @@ def lambda_hist(*names):
 					lambdas[k[0].count('1'), i] += 1
 		return lambdas
 
+	data = read(TOP)
+	data = data / data[:,10:].max()
+
+
 	def dump(a):
 		print '\n'.join([ ' '.join(map(str, l)) for l in a ]), '\ne\ne'
 
-	print '''
+	print r'''
 		reset
-		set termoptions enhanced
 		unset key
+		
+		set palette defined (0 "white", 0.25 "#729fcf", 0.5 "#cc0000", 1 "#fce94f")
 		unset colorbox
-		unset border
-		set multiplot layout 2,2 rowsfirst
-		set yrange [-0.5:32.5]
 		set cbrange [0:1]
-	'''
 
-	datas = map(read, [10, ALL])
-	datas = map(lambda x: x / x[:,10:].max(), datas)
+		unset border
+		set multiplot layout 1,2
 
-	for i, data in enumerate(datas):
-		margin = 1.35
-		if i == 0:
-			print '''
-				unset x2tics
-				set xtics out nomirror font ",10"
-				set label 1 "Generation" at graph 0, graph 0 center rotate by 90 font ",10" offset -7, -{0}
-				set ylabel "λ_{{10}}" font ",10"
-				set tmargin 1
-				set bmargin {0}
-			'''.format(margin)
-		else:
-			print '''
-				unset xtics
-				set x2tics out nomirror format ""
-				set ylabel "λ_{{160}}" font ",10"
-				set tmargin {0}
-				set bmargin 1
-			'''.format(margin)
+		set yrange [-0.5:24.5]
+		set ylabel '$\lambda$' offset 3,0
+		set ytics 4 out nomirror format '\sfrac{{%.0f}}{{32}}'
+		set mytics 4
 
-		print '''
-			set ytics 4 out nomirror font ",10"
-			unset lmargin
-			set rmargin 0
-			set  xrange [-0.5:{0}+0.5]
-			set x2range [-0.5:{0}+0.5]
-			plot "-" matrix w image
-		'''.format(DETAIL - 1)
-		dump(data[:,:DETAIL+1])
+		set xrange [-0.5:{0}+0.5]
+		set xtics 5 out nomirror format "[c]{{%.f}}"
+		set mxtics 5
+		set xlabel ' '
+		
+		set rmargin 0
+		
+		plot "-" matrix w image
+	'''.format(DETAIL - 1)
+	dump(data[:,:DETAIL+1])
 
-		print '''
-			unset ytics
-			unset ylabel
-			set lmargin 0
-			unset rmargin
-			unset label 1
-			set  xrange [{0}-0.5:{1}+0.5]
-			set x2range [{0}-0.5:{1}+0.5]
-			plot "-" matrix using ($1 + {0} - 1):2:3 w image
-		'''.format(DETAIL, GENS - 1)
-		dump(data[:,DETAIL-1:])
+	print '''
+		unset ytics
+		unset ylabel
+		set lmargin 0
+		set rmargin 1
+		set xtics 20
+		set mxtics 20
+		set  xrange [{0}-0.5:{1}+0.5]
+		plot "-" matrix using ($1 + {0} - 1):2:3 w image
+	'''.format(DETAIL, GENS - 1)
+	dump(data[:,DETAIL-1:])
 
 	print 'unset multiplot'
 

@@ -3,37 +3,48 @@
 from __future__ import division
 from visualize import *
 
-def lambda_hist(*names):
-	paper = [ 0,  0,  0,  0,  0,  0,  0,  0,
+def lambda_hist(*params):
+	paper = array([ 0,  0,  0,  0,  0,  0,  0,  0,
 	          0,  0,  2, 16, 21, 37, 39, 31,
 	         31, 15,  6,  2,  0,  0,  0,  0,
-	          0,  0,  0,  0,  0,  0,  0,  0, 0]
-	data = []
+	          0,  0,  0,  0,  0,  0,  0,  0, 0])
+
+	titles = ['Paper'] + list(params[1::2])
+	names = params[::2]
+	count = [sum(paper)]
+	data = [paper / max(paper)]
 	for pat in names:
-		lambdas = [0] * 33
-		for name in glob(pat + '*/'):
-			for i in read_this_pop(name, 200, 10):
-				lambdas[i[0].count('1')] += 1
+		lambdas = zeros((33))
+		rules = list([
+			i[0]
+			for name in glob(pat + '*/')
+			for i in read_this_pop(name, 199, 10)
+		])
+		#rules = list(set(rules))
+		count.append(len(rules))
+		for r in rules:
+			lambdas[r.count('1')] += 1
+		lambdas /= max(lambdas)
 		data.append(lambdas)
 
-	print '''
+	print r'''
 		reset
 		set termoptions enhanced
 		unset colorbox
 		set palette rgb 33,13,10
-		set key top right samplen 1
+		set key at graph 0.8,graph 1 reverse Left samplen 0.5 spacing 1.5
 		set xrange [0:32]
 		set yrange [0:*]
 		unset border
-		set xtics 1 scale 0 font ",10"
-		set xlabel "λ_{10}" font ",10"
+		set xtics 1 scale 0 format '[c]{$\frac{%.0f}{32}$}'
+		set xlabel '$\lambda$'
 		unset ytics
 		set style fill solid 1 noborder
 	'''
 
-	print 'plot "-" w boxes lc rgbcolor "black" t "Paper", ', ','.join([
-		'"-"w boxes lc rgbcolor "{0}" t "Lauf {1}"'.format(c, i)
-		for i, (_, c) in enumerate(zip(data, ['#80b2e8', '#c791c1', '#e9b96e']), 1)
+	print 'plot ', ','.join([
+		'"-" w boxes lc rgbcolor "{0}" t "{1}"'.format(color, title, c)
+		for title, color, c in zip(titles, ['black'] + COLORS, count)
 	])
 
 	def histogram(datas, widths):
@@ -54,10 +65,9 @@ def lambda_hist(*names):
 			print 'e'
 
 	fullw = 0.8
-	bigw = fullw / 2
-	smallw = (fullw - bigw) / len(data)
+	smallw = fullw / len(data)
 
-	histogram([paper] + data, [bigw] + [smallw] * len(data))
+	histogram(data, [smallw] * len(data))
 
 if __name__ == '__main__':
 	lambda_hist(*sys.argv[1:])

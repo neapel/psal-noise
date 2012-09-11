@@ -618,16 +618,8 @@ int main(int argc, char **argv) {
 		// dump parameters
 		{
 			ofstream params(directory + "/parameters");
-			params
-				<< " --name" << directory
-				<< " --width " << width
-				<< " --height " << height
-				<< " --initials " << initials
-				<< " --resid " << resid
-				<< " --fit " << fit
-				<< " --mutation " << mutation_prob
-				<< " --crossover " << crossover_prob
-				<< " --seed " << seed << endl;
+			for(int i = 1 ; i < argc ; i++)
+				params << argv[i] << '\n';
 		}
 
 		// run

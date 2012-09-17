@@ -22,11 +22,11 @@ def profile(name):
 		set palette defined (0 "#a40000", 0.5 "#ffffff", 1 "#0062a3")
 		set colorbox user horizontal origin graph 0, character 0.5 size character 10, character 0.5 noborder
 		set cbrange [0:1]
-		set cbtics scale 0 offset 0,0.75 ("0" 0, "1" 1)
+		set cbtics scale 0 offset 0,0.75 ('[r]{$0\;$}' 0, '[l]{$\;1$}' 1)
 		unset border
 		set yrange [0.5:31.5]
 		set ytics 1,2 scale 1,1 out nomirror format '$\overline R_{%.0f}$'
-		set lmargin 5
+		set lmargin 8
 		set rmargin 5
 		set mytics 2
 		set xrange [0-0.5 : 200-0.5]

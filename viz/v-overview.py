@@ -12,7 +12,7 @@ def overview(name):
 
 	print '''
 		reset
-		set key top left vertical reverse Left samplen 0.5
+		unset key
 
 		set ytics border nomirror out
 		set ylabel '$\overline F$'
@@ -20,7 +20,10 @@ def overview(name):
 		set mxtics 10
 		set xlabel "Generation"
 
-		set border 0
+		set lmargin 8
+		set rmargin 5
+
+		set border 3
 		set yrange [0:{0}]
 		set xrange [-0.5:{1} + 0.5]
 
